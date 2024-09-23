@@ -94,4 +94,66 @@ const loginUser=AsyncHandler(async(req,res)=>{
       )
    )
 });
-export {register,loginUser};
+
+const logoutUser=AsyncHandler(async(req,res)=>{
+   const id=req.user._id;
+   const user=await User.findByIdAndUpdate(id,{refreshToken:""});
+   if(!user){
+      throw new ApiError(500,"Something went wrong while logging out");
+   }
+   const options={
+      httpOnly:true,
+      secure:true
+   }
+   return res.status(200).clearCookies("accessToken",options).clearCookies("refreshToken",options).json(new ApiResponse(200,"User logged out successfully"));
+});
+
+const updateProfile=AsyncHandler(async(req,res)=>{
+   const {name,email,bio,skills,mobileNumber,education}=req.body;
+   const id=req.user._id;
+   const resumePath=req.files?.resume[0]?.path;
+   const resume=await uploadFile(resumePath);
+   if(!resume){
+      throw new ApiError(500,"Something went wrong while updating resume");
+   }
+   let skillsArray=skills.split(",");
+   let educationArray=education.split(",");
+   const user=await User.findByIdAndUpdate(id,{
+      name,
+      email,
+      bio,
+      skills:skillsArray,
+      mobileNumber,
+      education:educationArray,
+      resume:resume.secure_url
+   });
+   if(!user){
+      throw new ApiError(500,"Something went wrong while updating profile");
+   }
+   const updatedUser=await User.findById(id).select("-password -resetPasswordToken -refreshToken");
+   return res.status(200).json(new ApiResponse(200,"Profile updated successfully",updatedUser));
+});
+
+const refreshAccessToken=AsyncHandler(async(req,res)=>{
+   const token=req.cookies ? req.cookies.refreshToken:null;
+   if(!token){
+      throw new ApiError(401,"Unauthorized");
+   }
+   const decodedToken=jwt.verify(token,process.env.REFRESH_TOKEN_SECRET);
+   const user=await User.findById(decodedToken._id);
+   if(!user){
+      throw new ApiError(401,"Invalid refresh token");
+   }
+   const {accessToken,refreshToken}=await generateTokens(user._id);
+   return res.status(200).cookie("accessToken",accessToken,options).cookie("refreshToken",refreshToken,options).json(new ApiResponse(200,"Access token refreshed successfully"));
+});
+
+const getUserDetails=AsyncHandler(async(req,res)=>{
+   const id=req.user._id;
+   const user=await User.findById(id).select("-password -resetPasswordToken -refreshToken");
+   if(!user){
+      throw new ApiError(404,"User not found");
+   }
+   return res.status(200).json(new ApiResponse(200,"User details fetched successfully",user));
+});
+export {register,loginUser,logoutUser,generateTokens,updateProfile,refreshAccessToken};
