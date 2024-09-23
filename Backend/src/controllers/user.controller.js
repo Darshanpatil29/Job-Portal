@@ -118,19 +118,28 @@ const updateProfile=AsyncHandler(async(req,res)=>{
    }
    let skillsArray=skills.split(",");
    let educationArray=education.split(",");
-   const user=await User.findByIdAndUpdate(id,{
-      name,
-      email,
-      bio,
-      skills:skillsArray,
-      mobileNumber,
-      education:educationArray,
-      resume:resume.secure_url
-   });
+   const user=await User.findById(id);
    if(!user){
-      throw new ApiError(500,"Something went wrong while updating profile");
+      throw new ApiError(404,"User not found");
    }
-   const updatedUser=await User.findById(id).select("-password -resetPasswordToken -refreshToken");
+
+   if(name) user.name=name;
+   if(email) user.email=email;
+   if(bio) user.profile.bio=bio;
+   if(skills) user.profile.skills=skillsArray;
+   if(mobileNumber) user.mobileNumber=mobileNumber;
+   if(education) user.profile.education=educationArray;
+   if(resume) user.profile.resume=resume.secure_url;
+
+   await user.save();
+
+   const updatedUser={
+      name:user.name,
+      email:user.email,
+      mobileNumber:user.mobileNumber,
+      role:user.role,
+      profile:user.profile
+   }
    return res.status(200).json(new ApiResponse(200,"Profile updated successfully",updatedUser));
 });
 
