@@ -7,16 +7,16 @@ const userRoutes=Router();
 
 userRoutes.route('/register').post(
     upload.single(
-        profilePicture
+       "profilePicture"
     ),
     register
 )
 
-userRoutes.route('/login').post(verifyJWT,loginUser);
+userRoutes.route('/login').post(loginUser);
 
 userRoutes.route('/logout').post(verifyJWT,logoutUser);
 
-userRoutes.route('/update-user-details').put(verifyJWT,updateUserDetails);
+userRoutes.route('/update-user-details').put(verifyJWT,updateProfile);
 
 userRoutes.route('/refresh-token').get(refreshAccessToken);
 

@@ -1,51 +1,54 @@
-import {User} from '../models/user.models.js';
-import {ApiError,AsyncHandler,ApiResponse} from '../utils/AsyncHandler.js';
+import User from '../models/user.models.js';
+import AsyncHandler from '../utils/AsyncHandler.js';
+import ApiError from '../utils/ApiError.js';
+import ApiResponse from '../utils/ApiResponse.js';
 import { uploadFile } from '../utils/Cloudinary.js';
 
 const generateTokens=async(userId)=>{
    try{
       const user=await User.findOne(userId);
-      const accessToken=user.generateAccessToken();
-      const refreshToken=user.generateRefreshToken();
-      user.refreshToken=refreshToken;
+      const accessToken=await user.generateAccessToken();
+      const refreshToken=await user.generateRefreshToken();
+      user.refreshToken=await refreshToken;
       await user.save({
          validateBeforeSave:false
       });
       return {accessToken,refreshToken};
    }
+   
    catch(err){
       throw new ApiError()
    }
 }
 // Create and Save a new User
 const register=AsyncHandler(async(req,res)=>{
-   const {name,email,password,role}=req.body;
+   const {name,email,mobileNumber,password,role}=req.body;
 
-   if([name,email,password,role].some((field)=>{
-    if(field.trim()==="") return true;
-   })){
-    throw new ApiError(400,"All fields are required");
-   }
+    // Check if any of the fields are empty
+    if ([name, email,mobileNumber, password, role].some((field) => field.trim() === "")) {
+      throw new ApiError(400, "All fields are required");
+  }
 
-   if(!(email.include("@") && email.include("."))){
-    throw new ApiError(400,"Invalid email");
-   }
+  // Validate email format
+  if (!(email.includes("@") && email.includes("."))) {
+      throw new ApiError(400, "Invalid email");
+  }
 
    const existedUser=await User.findOne({email});
 
    if(existedUser){
     throw new ApiError(400,"User already exists");
    }
-
-   const profilePath=req.files?.profilePicture[0]?.path;
-   const profile=await uploadFile(profilePath);
+   const profilePictureLocalPath=req.file?.path;
+   const profile=await uploadFile(profilePictureLocalPath);
    if(!profile){
-    throw new ApiError(500,"Something went wrong while updating profile picture");
+      throw new ApiError(500,"Something went wrong while uploading profile picture");
    }
 
    const user=await User.create({
     name,
     email,
+    mobileNumber,
     password,
     role,
     profile:{
@@ -53,7 +56,7 @@ const register=AsyncHandler(async(req,res)=>{
     },
    })
 
-   const createdUser=await user.findById(user._id).select("-password -resetPasswordToken -refreshToken");
+   const createdUser=await User.findById(user._id).select("-password -resetPasswordToken -refreshToken");
    
    if(!createdUser){
     throw new ApiError(500,"Something went wrong while creating unew ser");
@@ -82,8 +85,14 @@ const loginUser=AsyncHandler(async(req,res)=>{
 
    const {accessToken,refreshToken}=await generateTokens(existedUser._id);
 
+   console.log(refreshToken);
+   
    const loggedUser=await User.findById(existedUser._id);
 
+   const options={
+      httpOnly:true,
+      secure:true
+   }
    return res.status(200).cookie("accessToken",accessToken,options).cookie("refreshToken",refreshToken,refreshToken).json(
       new ApiResponse(
          200,
@@ -105,7 +114,7 @@ const logoutUser=AsyncHandler(async(req,res)=>{
       httpOnly:true,
       secure:true
    }
-   return res.status(200).clearCookies("accessToken",options).clearCookies("refreshToken",options).json(new ApiResponse(200,"User logged out successfully"));
+   return res.status(200).clearCookie("accessToken",options).clearCookie("refreshToken",options).json(new ApiResponse(200,"User logged out successfully"));
 });
 
 const updateProfile=AsyncHandler(async(req,res)=>{
@@ -165,4 +174,4 @@ const getUserDetails=AsyncHandler(async(req,res)=>{
    }
    return res.status(200).json(new ApiResponse(200,"User details fetched successfully",user));
 });
-export {register,loginUser,logoutUser,generateTokens,updateProfile,refreshAccessToken};
+export {register,loginUser,logoutUser,generateTokens,updateProfile,refreshAccessToken,getUserDetails};

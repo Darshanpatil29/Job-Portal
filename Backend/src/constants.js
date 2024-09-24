@@ -1,1 +1,1 @@
-export const DB_NAME="Job Portal"
+export const DB_NAME="JobPortal"

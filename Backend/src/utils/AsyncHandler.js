@@ -5,3 +5,5 @@ const AsyncHandler=(fn)=>async(req,res,next)=>{
         return next(err);
     }
 }
+
+export default AsyncHandler;
